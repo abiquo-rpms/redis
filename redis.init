@@ -1,0 +1,83 @@
+#!/bin/bash
+#
+# Init file for redis
+#
+# Written by Jason Priebe <jpriebe@cbcnewmedia.com>
+#
+# chkconfig: - 80 12
+# description: A persistent key-value database with network interface
+# processname: redis-server
+# config: /etc/redis.conf
+# pidfile: /var/run/redis.pid
+
+source /etc/rc.d/init.d/functions
+
+RETVAL=0
+prog="redis-server"
+
+start() {
+	echo -n $"Starting $prog: "
+	daemon --user redis --pidfile /var/run/run/redis.pid /usr/sbin/$prog /etc/redis.conf
+	RETVAL=$?
+	echo
+	[ $RETVAL -eq 0 ] && touch /var/lock/subsys/$prog
+	return $RETVAL
+}
+
+stop() {
+    PID=`cat /var/run/redis.pid 2>/dev/null`
+    if [ -n "$PID" ]; then
+        echo "Shutdown may take a while; redis needs to save the entire database";
+        echo -n $"Shutting down $prog: "
+        /usr/bin/redis-cli shutdown
+        if checkpid $PID 2>&1; then
+            echo_failure
+            RETVAL=1
+        else
+            rm -f /var/lib/redis/temp*rdb
+            rm -f /var/lock/subsys/$prog
+            echo_success
+            RETVAL=0
+        fi
+    else
+        echo -n $"$prog is not running"
+        echo_failure
+        RETVAL=1
+    fi
+
+    echo
+    return $RETVAL
+}
+
+restart() {
+	stop
+	start
+}
+
+condrestart() {
+    [-e /var/lock/subsys/$prog] && restart || :
+}
+
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  status)
+	status -p /var/run/redis.pid $prog
+	RETVAL=$?
+	;;
+  restart)
+	restart
+	;;
+  condrestart|try-restart)
+	condrestart
+	;;
+   *)
+	echo $"Usage: $0 {start|stop|status|restart|condrestart}"
+	RETVAL=1
+esac
+
+exit $RETVAL
